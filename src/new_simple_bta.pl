@@ -545,6 +545,19 @@ check_body(Call_,InSV,OutSV,Path) :-
 	 ;   check_unfold_call(Call,CallPattern,Fun,Arity,InSV,OutSV,Path)
 	).
 
+
+
+:- begin_tests(check_body).
+
+test(check_body1) :-
+    check_body(true, X, Y, _), !, X == Y.
+
+test(check_body2) :-
+    check_body((true, true), X, Y, _), !, X == Y.
+
+
+:- end_tests(check_body).
+
 % check whether a call should be memoised or not
 %memoise_this_call/5: original version
 memoise_this_call(_Path,_Fun,_Arity,_CallPattern,Call) :- %println(memo_check(Call)),
@@ -785,6 +798,30 @@ get_abstract_pattern(Call,Pattern,aenv(StaticVars,ListNVVars,ListVars,NonvarVars
    % print(get_arg_sd_vals_exit(Args,Pattern,StaticVars,ListVars,NonvarVars)),nl.
 get_abstract_pattern(Call,Pattern,Env) :- print(illegal_call(get_abstract_pattern(Call,Pattern,Env))),nl,fail.
 
+:- begin_tests(get_abstract_pattern).
+
+test(get_abstract_parttern1) :-
+    get_abstract_pattern(foo(A,_B), Pattern, aenv([A], [], [], [])), !,
+    Pattern == [s, d].
+
+test(get_abstract_parttern2) :-
+    get_abstract_pattern(foo([1,2|A],B), Pattern, aenv([B], [A], [], [])), !,
+    Pattern == [list_nv, s].
+
+test(get_abstract_parttern3) :-
+    get_abstract_pattern(foo(B,B), Pattern, aenv([B], [], [], [])), !,
+    Pattern == [s, s].
+
+test(get_abstract_parttern4) :-
+    get_abstract_pattern(foo([A,B,C],_D), Pattern, aenv([A], [B,C], [], [])), !,
+    Pattern == [list_nv, d].
+
+test(get_abstract_parttern5, blocked('the first argument apparently is nv, but IMO it should be d. Am I wrong or is this test case not defined?')) :-
+    get_abstract_pattern(foo([A,B,C|_E],_D), Pattern, aenv([A], [B,C], [], [])), !,
+    Pattern == [d, d].
+
+:- end_tests(get_abstract_pattern).
+
 /* TO DO: the variables which are list_nv are not yet propagated */
 get_arg_sd_vals([],[],_,_,_,_).
 get_arg_sd_vals([H|T],[SD|TSD],SV,LnvV,LV,NV) :-
@@ -805,6 +842,28 @@ get_arg_sd_vals([H|T],[SD|TSD],SV,LnvV,LV,NV) :-
 list_skel_end(X,[X]) :- var(X),!.
 list_skel_end([],[]).
 list_skel_end([_|T],End) :- list_skel_end(T,End).
+
+:- begin_tests(list_skel_end).
+
+test(list_skel_end1) :-
+    list_skel_end(X, [X]).
+
+test(list_skel_end2) :-
+    list_skel_end([], []).
+
+test(list_skel_end3) :-
+    list_skel_end([a, b|X], [X]).
+
+test(list_skel_end4) :-
+    list_skel_end([a, b, c], []).
+
+test(list_skel_end5) :-
+    list_skel_end([_A, _B|X], [X]).
+
+test(list_skel_end6) :-
+    list_skel_end([_A, _B, _C], []).
+
+:- end_tests(list_skel_end).
 
 nv_list_els(X,R) :- var(X),!,R=[].
 nv_list_els([],[]).
@@ -901,7 +960,7 @@ test(abstract_env12) :-
     update_abstract_environment([s, list_nv, list, nv], [X, Y, Z, Y], aenv([], [], [], []), Res), !,
     Res == aenv([X], [Y], [Z], []).
 
-test(abstract_env13) :-
+test(abstract_env13, blocked('unclear semantics')) :-
     update_abstract_environment([nv, list, list_nv, s], [X, Y, Z, Y], aenv([], [], [], []), Res), !,
     Res == aenv([Y], [Z], [], [X]).
 
@@ -927,13 +986,44 @@ insert([H|T],X,R) :- (H==X -> R=[H|T] ; R=[H|R2],insert(T,X,R2)).
 exact_subset([],_).
 exact_subset([H|T],L) :- exact_del(H,L,L2), exact_subset(T,L2).
 
+:- begin_tests(exact_subset).
 
+test(exact_subset1) :-
+    exact_subset([], _).
+
+test(exact_subset2) :-
+    exact_subset([A,B,C], [A,_D,C,B]).
+
+test(exact_subset3, fail) :-
+    exact_subset([_A,B,C], [_D,C,B]).
+
+:- end_tests(exact_subset).
+
+
+% checks whether first argument is subset of the union of the second and third argument
 exact_subset_of_two([],_,_).
 exact_subset_of_two([H|T],L1,L2) :- 
    (exact_del(H,L1,L12) ->  exact_subset_of_two(T,L12,L2)
             ; (exact_del(H,L2,L22), exact_subset_of_two(T,L1,L22))
    ).
 
+:- begin_tests(exact_subset_of_two).
+
+test(exact_subset_of_two1) :-
+    exact_subset_of_two([], _, _).
+
+test(exact_subset_of_two2) :-
+    exact_subset_of_two([A,B,C], [A,_D,C,B], [_E,_F]).
+
+test(exact_subset_of_two3) :-
+    exact_subset_of_two([A,B,C], [A,_D,C], [B, _E,_F]).
+
+test(exact_subset_of_two4, fail) :-
+    exact_subset_of_two([_A,B,C], [_D,C,B], []).
+
+:- end_tests(exact_subset_of_two).
+
+% checks whether first argument is subset of the union of the second, third and fourth argument
 exact_subset_of_three([],_,_,_).
 exact_subset_of_three([H|T],L1,L2,L3) :- 
    (exact_del(H,L1,L12) ->  exact_subset_of_three(T,L12,L2,L3)
