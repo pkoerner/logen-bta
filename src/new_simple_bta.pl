@@ -20,6 +20,7 @@
 %%:- use_module(size_change_analysis).
 %%:- use_module(size_change_analysis_without_labels).
 %%:- use_module('obsolete/new_size_change_analysis').
+:- use_module(library(plunit)).
 
 :- dynamic verbose/0. 
 assert_verbose :- verbose -> true ; assert(verbose).
@@ -813,6 +814,10 @@ nv_list_els([H|T],Res) :-
 
 :- use_module(library(terms)).
 
+
+
+
+
 /* update_abstract_environment(BindingTypeSuccessPatternList,ConcreteCallPatternList, AbstractEnv, UpdatedAbstractEnv) */
 /* predicate is called to update an abstract environment based on a success pattern inferred by the analysis */
 update_abstract_environment(bot,_,_,_) :- fail. % bot makes all args static; probably better to fail ???
@@ -843,6 +848,70 @@ update_abstract_environment([nv|T],[S|TT],aenv(SV,LnvV,LV,InNV),Res) :- !,
    update_abstract_environment(T,TT,aenv(SV,LnvV,LV,In2NV),Res).
 update_abstract_environment([_|T],[_|TT],In,Out) :-
    update_abstract_environment(T,TT,In,Out).
+
+
+
+:- begin_tests(update_abstract_environment).
+
+test(abstract_env1) :-
+    update_abstract_environment([s, d], [X, _Y], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [], [], []).
+
+test(abstract_env2) :-
+    update_abstract_environment([s, d], [X, X], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [], [], []).
+
+test(abstract_env3) :-
+    update_abstract_environment([s, s], [X, X], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [], [], []).
+
+test(abstract_env4) :-
+    update_abstract_environment([s, s], [X, Y], aenv([], [], [], []), Res), !,
+    Res == aenv([X, Y], [], [], []).
+
+test(abstract_env5) :-
+    update_abstract_environment([s, nv], [X, Y], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [], [], [Y]).
+
+test(abstract_env6) :-
+    update_abstract_environment([s, list_nv], [X, Y], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [Y], [], []).
+
+test(abstract_env7) :-
+    update_abstract_environment([s, list_nv], [X, X], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [], [], []).
+
+test(abstract_env8) :-
+    update_abstract_environment([s, list_nv, list], [X, Y, Z], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [Y], [Z], []).
+
+test(abstract_env9) :-
+    update_abstract_environment([s, list_nv, list], [X, Y, Y], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [Y], [], []).
+
+test(abstract_env10) :-
+    update_abstract_environment([s, list_nv, list], [X, X, X], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [], [], []).
+
+test(abstract_env11) :-
+    update_abstract_environment([s, list_nv, list, nv], [X, Y, Z, U], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [Y], [Z], [U]).
+
+test(abstract_env12) :-
+    update_abstract_environment([s, list_nv, list, nv], [X, Y, Z, Y], aenv([], [], [], []), Res), !,
+    Res == aenv([X], [Y], [Z], []).
+
+test(abstract_env13) :-
+    update_abstract_environment([nv, list, list_nv, s], [X, Y, Z, Y], aenv([], [], [], []), Res), !,
+    Res == aenv([Y], [Z], [], [X]).
+
+:- end_tests(update_abstract_environment).
+
+
+
+
+
+
 
 /* take a pattern and set all arguments as static */
 set_static([],[]).
@@ -886,9 +955,31 @@ exact_inter([H1|T1],L2,Res) :-
 	 ;  (L2D=L2, Res=RR)
 	),exact_inter(T1,L2D,RR).
 
+
+%% removes all elements from the first argument list from the second argument list
 exact_rem([],R,R).
 exact_rem([H|T],In,Out) :-
   (exact_del(H,In,In2)
     -> exact_rem(T,In2,Out)
      ; exact_rem(T,In,Out)
   ).
+
+
+:- begin_tests(exact_rem).
+
+test(exact_rem1) :-
+    exact_rem([], [], []).
+
+test(exact_rem2) :-
+    exact_rem([a,b], [], []).
+
+test(exact_rem3) :-
+    exact_rem([a,b], [a,b], []).
+
+test(exact_rem4) :-
+    exact_rem([b,a], [a,b], []).
+
+test(exact_rem5) :-
+    exact_rem([b,a], [a,b,c], [c]).
+
+:- end_tests(exact_rem).
