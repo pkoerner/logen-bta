@@ -574,6 +574,27 @@ memoise_this_call(Path,_Fun,_Arity,_CallPattern,_Call) :-  \+ cli_option(no_loca
 memoise_this_call(_Path,Fun,Arity,CallPattern,_Call) :-  \+ cli_option(no_local_termination), 
    call_is_not_terminating(Fun,Arity,CallPattern). % we should memo if the call is potentially not terminating
 
+:- begin_tests(memoise_this_call).
+
+test(memoise_this_call1, fail) :-
+    % foo :- true.
+    memoise_this_call(9001, true, 0, [], true).
+
+test(memoise_this_call2, fail) :-
+    % foo :- bar(A), true.
+    memoise_this_call(and1(9001), bar, 1, [s], bar(_)).
+
+test(memoise_this_call3) :-
+    % foo :- \+ bar(A).
+    memoise_this_call(not(9001), bar, 1, [s], bar(_)).
+
+
+test(memoise_this_call4) :-
+    % foo :- nl. (random side effect)
+    memoise_this_call(9001, nl, 0, [], nl).
+
+:- end_tests(memoise_this_call).
+
 contains_dangerous_construct(not(_)) :- !.
 contains_dangerous_construct(X) :- nonvar(X),X=..[_,A], contains_dangerous_construct(A).
 
@@ -585,8 +606,7 @@ memo_program_point(Path,Fun,Arity,CallPattern) :-
 memo_program_point(Path,Fun,Arity,CallPattern) :- memo_program_point2(Path,Fun,Arity,CallPattern).
 
 memo_program_point2(Path,Fun,Arity,_CallPattern) :-
-   is_built_in(Fun,Arity),!,
-   assert_rescall(Path).
+   is_built_in(Fun,Arity),!, assert_rescall(Path).
 memo_program_point2(Path,Fun,Arity,CallPattern) :-
    generalise_memo_pattern(Fun,Arity,CallPattern,MemoPattern),
    assert_memo(Path,Fun,Arity,MemoPattern),
@@ -628,6 +648,29 @@ check_memo_call_pattern(Fun,Arity,CallPattern,AnswPat,Path) :-
 	        assert_new_calls_answers(Fun,Arity,user,CallPattern,memo(Path))
 	).
 
+:- begin_tests(check_unfold_call).
+
+test(check_unfold_call1, [fail, cleanup((prolog_reader:retract(':-'(foo(_A,_B), true)),
+                                         retractall(calls_answers(foo, 2, _, _, _))))]) :-
+    prolog_reader:assert(':-'(foo(_A,_B), true)),
+    check_unfold_call(foo(_A, _B), [d, d], foo, 2, aenv([], [], [], []), _OutSv, _Path).
+
+test(check_unfold_call2, [ %block('I have no idea what is happening here'),
+                          cleanup((prolog_reader:retract(':-'(foo(_A,_B), true)),
+                                   retractall(calls_answers(foo, 2, _, _, _)),
+                                   retractall(logen_unfold(9001))))]) :-
+    prolog_reader:assert(':-'(foo(_A,_B), true)),
+    \+ check_unfold_call(foo(_A, _B), [d, d], foo, 2, aenv([], [], [], []), _OutSv, 9001),
+    calls_answers(foo, 2, user, [d,d], bot),
+    \+ logen_unfold(9001),
+    \+ check_unfold_call(foo(_A, _B), [d, d], foo, 2, aenv([], [], [], []), _OutSv, _Path),
+    calls_answers(foo, 2, user, [d,d], bot),
+    logen_unfold(9001).
+
+
+
+
+:- end_tests(check_unfold_call).
 
 check_call_pattern_for_unfold(Fun,Arity,CallPattern,AnswPat,Path,_Call) :-
 	(calls_answers(Fun,Arity,_Module,CallPattern,AnswPat)  

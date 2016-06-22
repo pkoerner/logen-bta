@@ -43,6 +43,7 @@ analyze_files(_,_).
       ; true),
     ((member(help,Options) ; RemArgV=[], \+ member(version,Options)) -> print_help ; true),
     (member(version,Options) -> print_version ; true),
+        trace,
     analyze_files(RemArgV,Options),
     (member(profile,Options) -> (view([ size_change_analysis:_, new_size_change_analysis:_])) ; true).
 
