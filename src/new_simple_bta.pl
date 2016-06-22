@@ -786,8 +786,10 @@ valid_binding_type(nv).
 valid_binding_type(list).
 valid_binding_type(list_nv).
 
+% an abstract environment has the form:
+% aenv(ListOf_StaticVars,ListOf_ListNVVars,ListOf_ListVars,ListOf_NonvarVars)
 
-top_env(aenv([],[],[],[])).
+top_env(aenv([],[],[],[])). % i.e., every variable is dynamic
 
 /* gets the abstract binding-type pattern of a concrete call, based on the
    abstract environment */
@@ -882,18 +884,19 @@ nv_list_els([H|T],Res) :-
 update_abstract_environment(bot,_,_,_) :- fail. % bot makes all args static; probably better to fail ???
 update_abstract_environment([],[],R,R).
 update_abstract_environment([s|T],[S|TT],aenv(InSV,LnvV,LV,NV),Res) :-  !,
-   term_variables(S,Vars),
-   l_insert(Vars,InSV,In2SV),
+   term_variables(S,Vars), % all Vars must be static
+   l_insert(Vars,InSV,In2SV), % add them to the list SV of static variables
+   % TO DO ? remove Vars from LnvV, LV, NV ?
    update_abstract_environment(T,TT,aenv(In2SV,LnvV,LV,NV),Res).
 update_abstract_environment([list_nv|T],[S|TT],aenv(SV,InvLV,LV,NV),Res) :- !,
    term_variables(S,Vars),
-   exact_rem(SV,Vars,ListVars),
+   exact_rem(SV,Vars,ListVars), % do not add the variables which are already static
    l_insert(ListVars,InvLV,Inv2LV),
    update_abstract_environment(T,TT,aenv(SV,Inv2LV,LV,NV),Res).
 update_abstract_environment([list|T],[S|TT],aenv(SV,LnvV,InLV,NV),Res) :- !,
    term_variables(S,Vars),
-   exact_rem(SV,Vars,V1),
-   exact_rem(LnvV,V1,ListVars),
+   exact_rem(SV,Vars,V1),   % do not add variables which are already static
+   exact_rem(LnvV,V1,ListVars), % do not add list(nonvar) variables
    l_insert(ListVars,InLV,In2LV),
    update_abstract_environment(T,TT,aenv(SV,LnvV,In2LV,NV),Res).
 update_abstract_environment([nv|T],[S|TT],aenv(SV,LnvV,LV,InNV),Res) :- !,
